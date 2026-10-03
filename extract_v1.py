@@ -11,8 +11,8 @@ from urllib3.util.retry import Retry
 
 BASE_URL = "https://data.elexon.co.uk/bmrs/api/v1"
 
-START_DATE = "2026-09-01"
-END_DATE = "2026-09-30"
+START_DATE = "2024-01-01"
+END_DATE = "2024-12-31"
 
 OUTPUT_CSV = "v1_remit_production_unavailability.csv"
 # OUTPUT_PARQUET = "v1_remit_production_unavailability.parquet"
@@ -62,7 +62,7 @@ def get_message_list(session, start_date, end_date):
         "to": f"{end_date}T00:00:00Z",
         "messageType": "UnavailabilitiesOfElectricityFacilities",
         "eventType": ["Production Unavailability"],
-        "latestRevisionOnly": "true"
+        "latestRevisionOnly": "false"
     }
 
     print("=" * 70)

@@ -5,27 +5,18 @@ raw_df = pd.read_csv("v1_remit_production_unavailability.csv")
 # 1. Drop unwanted columns 
 print(raw_df.columns.to_list())
 raw_df = raw_df.drop(columns=['dataset','messageType','messageHeading','participantId','unavailableCapacity','cause', 'affectedUnitEIC', 'affectedArea','durationUncertainty', 'relatedInformation', 'outageProfile'])
-# print("\nAFter dropping cols.....")
-# print(raw_df.columns.to_list())
 
 # 2. Filter out eventStatus = Active and assetType = Production
 raw_df = raw_df[
     (raw_df["eventStatus"]=="Active") & (raw_df["assetType"]=="Production")
 ]
+raw_df=raw_df.drop_duplicates()
 
-# # 3. Check for missing values
-# print(
-#     "Blank eventStartTime:",
-#     raw_df["eventStartTime"].isna().sum()
-#     + raw_df["eventStartTime"].astype(str).str.strip().eq("").sum()
-# )
-
-# print(
-#     "Blank eventEndTime:",
-#     raw_df["eventEndTime"].isna().sum()
-#     + raw_df["eventEndTime"].astype(str).str.strip().eq("").sum()
-# )
-raw_df
+raw_df = raw_df[(
+    raw_df["eventEndTime"]
+    > raw_df["eventStartTime"]
+)]
+raw_df = raw_df.dropna(subset=['fuelType'])
 
 raw_df = raw_df.loc[
     raw_df.groupby(
@@ -33,10 +24,7 @@ raw_df = raw_df.loc[
     )["revisionNumber"].idxmax()
 ].reset_index(drop=True)
 
-
-
-
-# 1. Ensure event columns are in datetime format
+# 3. Ensure event columns are in datetime format
 raw_df["eventStartTime"] = pd.to_datetime(raw_df["eventStartTime"])
 raw_df["eventEndTime"] = pd.to_datetime(raw_df["eventEndTime"])
 
@@ -71,90 +59,31 @@ def generate_month_ranges(row):
     return intervals
 
 
-# 2. Apply function to create a list of tuples (startTimeSeries, endTimeSeries)
+# 5. Apply function to create a list of tuples (startTimeSeries, endTimeSeries)
 raw_df["_intervals"] = raw_df.apply(generate_month_ranges, axis=1)
 
-# 3. Explode the list into individual rows (retains all other columns)
+# 6. Explode the list into individual rows (retains all other columns)
 df_expanded = raw_df.explode("_intervals").reset_index(drop=True)
 
-# 4. Split tuples into two separate columns
+# 7. Split tuples into two separate columns
 df_expanded[["startTimeSeries", "endTimeSeries"]] = pd.DataFrame(
     df_expanded["_intervals"].tolist(), index=df_expanded.index
 )
 
-# 5. Clean up temporary column
+# 8. Clean up temporary column
 df_expanded.drop(columns=["_intervals"], inplace=True)
+
+valid_periods = (
+    df_expanded["eventStartTime"] < df_expanded["eventEndTime"]
+)
+
+print(
+    "\nEvents where eventEndTime < eventStartTime:",
+    valid_periods.sum()
+)
 
 df_expanded.to_csv("v2_timeseries_check.csv")
 print(df_expanded["startTimeSeries"].isna().sum())
 
 
 
-# import pandas as pd
-
-# # Make sure event columns are datetime
-
-# df["eventStartTime"] = pd.to_datetime(df["eventStartTime"])
-
-# df["eventEndTime"] = pd.to_datetime(df["eventEndTime"])
-
-# def create_monthly_timeseries(row):
-
-#     start = row["eventStartTime"]
-
-#     end = row["eventEndTime"]
-
-#     periods = []
-
-#     current_start = start
-
-#     while current_start < end:
-
-#         # First day of the month after current_start
-
-#         next_month = (
-
-#             current_start.replace(day=1)
-
-#             + pd.offsets.MonthBegin(1)
-
-#         )
-
-#         # The next boundary cannot go beyond eventEndTime
-
-#         current_end = min(next_month, end)
-
-#         periods.append({
-
-#             "startTimeSeries": current_start,
-
-#             "endTimeSeries": current_end
-
-#         })
-
-#         current_start = current_end
-
-#     return periods
-
-# # Create the monthly intervals
-
-# df["timeSeries"] = df.apply(create_monthly_timeseries, axis=1)
-
-# # Explode the intervals into separate rows
-
-# df = df.explode("timeSeries", ignore_index=True)
-
-# # Extract start and end
-
-# df["startTimeSeries"] = df["timeSeries"].str["startTimeSeries"]
-
-# df["endTimeSeries"] = df["timeSeries"].str["endTimeSeries"]
-
-# # Remove temporary column
-
-# df = df.drop(columns="timeSeries")
-
-# print(df)
-
-
-# df.to_csv("elexon_timeSeries_check.csv")
